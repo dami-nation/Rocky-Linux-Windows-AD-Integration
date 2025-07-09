@@ -49,9 +49,10 @@ sudo authselect enable-feature with-mkhomedir
 
 7. **Test Domain User Login**
     ```bash
-su - 'DOMAIN\User'
+    su - 'DOMAIN\User'
 
 See Notes for more info.
 
-###Author
+### Author
+
 Dami Ola.
