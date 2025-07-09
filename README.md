@@ -32,20 +32,20 @@ This lab simulates integrating a Rocky Linux client into a Windows Server 2022 A
 
 3. **Join Domain**
    ```bash
-sudo realm join damilab.local -U Administrator
+    sudo realm join damilab.local -U Administrator
 
 4. **Verify Join**
    ```bash
-realm list
+    realm list
 
 5. **Access Control**
    ```bash
-sudo realm permit --all
-sudo vi /etc/sssd/sssd.conf
+    sudo realm permit --all
+    sudo vi /etc/sssd/sssd.conf
 
 6. **Enable Home Directory Creation**
    ```bash
-sudo authselect enable-feature with-mkhomedir
+    sudo authselect enable-feature with-mkhomedir
 
 7. **Test Domain User Login**
     ```bash
