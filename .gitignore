@@ -1,0 +1,16 @@
+*.iso
+*.log
+*.bak
+*.tmp
+*.swp
+*.swo
+.DS_Store
+__pycache__/
+*.pyc
+.env
+*.vbox*
+*.vdi
+*.ova
+*.ovf
+*.tar.gz
+*.zip
