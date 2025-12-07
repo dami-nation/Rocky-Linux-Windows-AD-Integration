@@ -1,153 +1,187 @@
+# Notes: Rocky Linux Integration with Windows Server 2022 Active Directory (VirtualBox)
+
 ## Overview
 
-This lab documents the full integration of Rocky Linux with a Windows Server 2022-based Active Directory domain controller. The goal was to simulate a real-world mixed OS environment, join the Linux client to the Windows domain, allow domain user authentication, and prepare for future group policy and shared file access testing.
+These notes document the full integration of a Rocky Linux client with a Windows Server 2022 Active Directory domain controller in a VirtualBox-based lab environment.
 
-These notes expand on the README and go into deep technical detail, including all problems encountered, fixes applied, and alternate options.
+The objective was to simulate a real-world mixed operating system environment, join the Linux client to the Windows domain, enable domain user authentication, and prepare the system for future testing such as group-based access control and shared file access.
 
-1. **VirtualBox Adapter Setup Strategy**
+This document expands on the main README and focuses on **implementation details, failures encountered, fixes applied, and alternative approaches**.
 
-We had two networking goals:
+---
 
-  - Internet access (for package installation, realmd, etc.)
+## VirtualBox Adapter Setup Strategy
 
-  - Internal LAN communication (with the DC at 192.168.10.10)
+There were two networking goals for this lab:
 
-I initially tried to join the DC before setting up NAT. This caused DNS and realm issues. I corrected it by:
+- Internet access for package installation (`dnf`, `realmd`, etc.)
+- Internal LAN communication with the domain controller at `192.168.10.10`
 
-a. Removing the realm.
+An early mistake was attempting to join the domain before proper NAT configuration was in place. This resulted in DNS resolution issues and failed `realm` operations.
 
-b. Ensuring Adapter 1 (NAT) was in place.
+The corrected sequence was:
 
-c. Completing all installs.
+1. Remove any partial or failed realm join.
+2. Configure **Adapter 1** as **NAT**.
+3. Complete all package installation and updates.
+4. Add **Adapter 2** as **Internal Network** only after internet-dependent steps were complete.
 
-d. Adding Adapter 2 (Internal Network) only after all internet tasks were complete.
+This sequencing prevented conflicts between external DNS resolution and internal domain discovery.
 
-2. **Rocky Linux Installation Tips**
-   
-  - Chose the Minimal installation option (no GUI)
+---
 
-  - Used the graphical installer once, then disabled GUI post-install:
+## Rocky Linux Installation Notes
+
+- Installed Rocky Linux using the **Minimal** installation option.
+- Used the graphical installer once, then disabled the GUI post-install:
 
 ```bash
 sudo systemctl set-default multi-user.target
 sudo reboot
+```
 
-  - Set hostname:
+Set the system hostname:
 
 ```bash
-hostnamectl set-hostname rockyclient1
+sudo hostnamectl set-hostname rockyclient1
+```
 
-3. **Internet Troubleshooting (NAT)**
+The CLI-only setup proved more stable and easier to debug.
+
+---
+
+## Internet Troubleshooting (NAT)
 
 ### Problem
 
-  - Even with NAT adapter, I could not ping 8.8.8.8
+- Even with a NAT adapter configured, the system could not reach external IPs.
+- `ping 8.8.8.8` failed.
+- `ping google.com` failed due to DNS resolution issues.
 
-  - ping google.com failed due to DNS misconfiguration
+### Resolution
 
-### Solution
-
-  - Verified that NAT was Adapter 1
-
-  - Confirmed NAT was set to attached to NAT in VirtualBox settings
-
-  - Restarted the VM
-
-  - Manually edited resolv.conf:
+- Verified that **Adapter 1** was set to **NAT** in VirtualBox.
+- Confirmed the adapter order.
+- Restarted the virtual machine.
+- Manually edited `/etc/resolv.conf` when NetworkManager was overriding settings:
 
 ```bash
 sudo chattr -i /etc/resolv.conf
 echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
 sudo chattr +i /etc/resolv.conf
+```
 
-  - Tested connectivity:
+Validated connectivity:
 
 ```bash
 ping 8.8.8.8
 ping google.com
+```
 
-4. **Installing Required Packages for AD Integration**
+---
 
-After internet was functional:
+## Installing Required Packages
+
+Once internet connectivity was restored:
 
 ```bash
-sudo dnf install realmd sssd oddjob oddjob-mkhomedir adcli samba-common samba-common-tools krb5-workstation -y
+sudo dnf install -y   realmd   sssd   oddjob   oddjob-mkhomedir   adcli   samba-common   samba-common-tools   krb5-workstation
+```
 
-Confirmed services:
+Verified SSSD service availability:
 
 ```bash
 systemctl status sssd
+```
 
-5. **Preparing for Domain Join**
+---
 
-a. Set correct DNS temporarily to the Domain Controller (Windows DC):
+## Preparing for Domain Join
+
+### Set Domain DNS
+
+Temporarily configured DNS to point to the domain controller:
 
 ```bash
 echo "nameserver 192.168.10.10" | sudo tee /etc/resolv.conf
 sudo chattr +i /etc/resolv.conf
+```
 
-b. Discover the domain
+### Discover the Domain
 
 ```bash
 realm discover corp.example.com
+```
 
-c. Join domain
+### Join the Domain
 
 ```bash
 sudo realm join corp.example.com -U Administrator
+```
 
-  - You will be prompted for the Administrator password
-
-  - If successful, test with:
+If successful, verify:
 
 ```bash
 realm list
 id Administrator@CORP.EXAMPLE.COM
+```
 
-6. **Post-Domain Join Configuration**
+---
 
-a. Allow domain users to log in
+## Post-Domain Join Configuration
+
+### Allow Domain Logins
+
+Allow all domain users:
 
 ```bash
 sudo realm permit --all
+```
 
-You can also selectively allow users:
+Or allow a specific user:
 
 ```bash
 sudo realm permit 'CORP\\dola'
+```
 
-b. Enable automatic home directory creation:
+### Enable Automatic Home Directory Creation
 
 ```bash
 sudo authselect select sssd with-mkhomedir --force
+```
 
-7. **Testing Authentication**
+---
 
-Use the following command to simulate login:
+## Testing Authentication
+
+Validate identity resolution:
 
 ```bash
 id dola@corp.example.com
+```
 
-If successful, it should show uid/gid info from AD.
-
-You can also test with su:
+Test an actual login:
 
 ```bash
 su - dola@corp.example.com
+```
 
-8. **Troubleshooting Login Issues**
+Successful output confirms PAM, NSS, and SSSD are functioning correctly.
 
-### Problem:
+---
 
-After realm join, the Linux VM rebooted and refused to accept domain credentials at login.
+## Troubleshooting Login Failures
 
-### Resolution Strategy:
+### Problem
 
-  - Used emergency mode to reset access
+After a successful realm join, the Linux system rebooted and rejected domain credentials at login.
 
-  - Verified `/etc/sssd/sssd.conf` settings:
+### Resolution Strategy
 
-```bash
+- Booted into emergency mode to regain access.
+- Validated `/etc/sssd/sssd.conf`:
+
+```ini
 [sssd]
 domains = corp.example.com
 config_file_version = 2
@@ -161,61 +195,74 @@ cache_credentials = True
 id_provider = ad
 auth_provider = ad
 access_provider = ad
+```
 
-  - Restarted sssd:
+- Restarted SSSD:
 
 ```bash
 sudo systemctl restart sssd
+```
 
-  - Ensured firewall rules weren’t blocking traffic between Linux and DC
+- Confirmed firewall rules were not blocking traffic between Linux and the domain controller.
 
-9. **Accessing Shared Folders from Windows**
+---
 
-To access a Windows SMB share:
+## Accessing Windows Shared Folders
 
-```bash
-sudo dnf install cifs-utils -y
-sudo mount -t cifs //192.168.10.10/SharedFolder /mnt/shared -o user=dola,domain=CORP.EXAMPLE.COM
-
-To make this permanent:
+Installed SMB utilities:
 
 ```bash
+sudo dnf install -y cifs-utils
+```
+
+Mounted the share manually:
+
+```bash
+sudo mount -t cifs //192.168.10.10/SharedFolder /mnt/shared   -o user=dola,domain=CORP.EXAMPLE.COM
+```
+
+To persist the mount, added an entry to `/etc/fstab`:
+
+```fstab
 //192.168.10.10/SharedFolder /mnt/shared cifs credentials=/etc/smb-credentials,iocharset=utf8,sec=ntlm 0 0
+```
 
-Contents of /etc/smb-credentials:
+Created credentials file:
 
 ```bash
+sudo nano /etc/smb-credentials
+```
+
+```text
 username=dola
 password=your_password
 domain=CORP.EXAMPLE.COM
+```
 
-Secure the file:
+Secured the file:
 
 ```bash
 sudo chmod 600 /etc/smb-credentials
+```
 
-10. **Summary of Lessons Learned**
+---
 
-  - Set up NAT first for internet connectivity.
+## Lessons Learned
 
-  - Add Internal Network adapter after completing installs.
+- Configure NAT first to ensure internet access.
+- Add the Internal Network adapter only after completing installs.
+- DNS misconfiguration causes most AD join and login failures.
+- Manually managing `/etc/resolv.conf` may be necessary in lab environments.
+- Minimal installs with CLI-only setups are more predictable.
+- Login failures are typically tied to DNS, PAM, or `sssd.conf`.
 
-  - Use chattr to manually manage /etc/resolv.conf when NetworkManager is overridden.
-
-  - Domain login failures are almost always DNS, PAM, or sssd.conf related.
-
-  - GUI is optional. Minimal install + CLI is stable for lab work.
-
-  - Post-integration, test domain user permissions and shared drive access.
+---
 
 ## Next Steps
 
-- Test group-based access controls via access_provider = ad
+- Test group-based access using `access_provider = ad`.
+- Configure sudo access for AD groups such as `CORP\LinuxAdmins`.
+- Join additional Linux clients to the domain.
+- Automate configuration using Ansible for multi-client environments.
 
-- Configure sudo access for domain groups (e.g. CORP\\LinuxAdmins)
-
-- Join another Linux client
-
-- Implement Ansible automation for multi-client configuration
-
-These notes are intended to serve as a definitive reference for setting up hybrid Windows–Linux domain environments using only VirtualBox and basic CLI tools
+These notes are intended to serve as a long-term reference for setting up and debugging hybrid Windows–Linux domain environments using VirtualBox and standard CLI tools.
