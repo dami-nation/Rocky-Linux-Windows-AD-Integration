@@ -1,6 +1,6 @@
 # Rocky Linux to Windows Active Directory Integration (VirtualBox)
 
-This lab documents the process of joining a Rocky Linux client to a Windows Server 2022 Active Directory domain using a VirtualBox based environment. The goal was to understand how Linux integrates into an AD-backed identity system in a mixed-OS setup, and where things typically fail when configuration is slightly off.
+This lab documents the process of joining a Rocky Linux client to a Windows Server 2022 Active Directory domain using a VirtualBox based environment. The goal was to understand how Linux integrates into an AD backed identity system in a mixed OS setup, and where things typically fail when configuration is slightly off.
 
 This is a *VirtualBox* implementation. A newer version of this lab using UTM on macOS, with a deeper focus on DNS, time synchronization, and network isolation, builds on the lessons learned here.
 
