@@ -6,7 +6,7 @@ These notes document the full integration of a Rocky Linux client with a Windows
 
 The objective was to simulate a real-world mixed operating system environment, join the Linux client to the Windows domain, enable domain user authentication, and prepare the system for future testing such as group-based access control and shared file access.
 
-This document expands on the main README and focuses on **implementation details, failures encountered, fixes applied, and alternative approaches**.
+This document expands on the main README, focusing on implementation details, failures encountered, fixes applied, and alternative approaches.
 
 ---
 
